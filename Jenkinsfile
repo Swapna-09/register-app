@@ -11,26 +11,21 @@ pipeline {
         DOCKER_PASS = 'dockerhub'
         IMAGE_NAME = "${DOCKER_USER}/${APP_NAME}"
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
-        TRIVY_CACHE_DIR = '/mnt/ebs100/trivy' // Use the EBS-mounted Trivy cache
+        TRIVY_CACHE = "/mnt/ebs100/trivy"   // Trivy cache on EBS
     }
     stages {
         stage("Cleanup Workspace & Docker") {
             steps {
                 script {
-                    // Clean workspace
+                    // Clean Jenkins workspace
                     cleanWs()
 
-                    // Remove old Docker containers
-                    sh 'docker container prune -f'
-
-                    // Remove dangling Docker images
-                    sh 'docker image prune -af'
-
-                    // Remove unused volumes
-                    sh 'docker volume prune -f'
-
-                    // Remove unused networks (optional)
-                    sh 'docker network prune -f'
+                    // Remove old Docker containers, images, and dangling volumes
+                    sh '''
+                        docker ps -aq | xargs -r docker rm -f
+                        docker images -aq | xargs -r docker rmi -f
+                        docker volume ls -q | xargs -r docker volume rm
+                    '''
                 }
             }
         }
@@ -56,7 +51,7 @@ pipeline {
         stage("SonarQube Analysis") {
             steps {
                 script {
-                    withSonarQubeEnv(credentialsId: 'jenkins-sonarqube-token') { 
+                    withSonarQubeEnv(credentialsId: 'jenkins-sonarqube-token') {
                         sh "mvn sonar:sonar"
                     }
                 }
@@ -75,7 +70,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('', DOCKER_PASS) {
-                        docker_image = docker.build "${IMAGE_NAME}"
+                        docker_image = docker.build("${IMAGE_NAME}")
                         docker_image.push("${IMAGE_TAG}")
                         docker_image.push('latest')
                     }
@@ -86,12 +81,17 @@ pipeline {
         stage("Trivy Scan") {
             steps {
                 script {
+                    // Ensure Trivy cache folder exists
+                    sh "mkdir -p ${TRIVY_CACHE}"
+
+                    // Run Trivy scan with cache on EBS
                     sh """
-                    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-                    -v ${TRIVY_CACHE_DIR}:/root/.cache/ aquasec/trivy \
-                    image ${IMAGE_NAME}:${IMAGE_TAG} \
-                    --no-progress --scanners vuln --exit-code 0 \
-                    --severity HIGH,CRITICAL --format table
+                        docker run --rm \
+                          -v /var/run/docker.sock:/var/run/docker.sock \
+                          -v ${TRIVY_CACHE}:/root/.cache/ \
+                          aquasec/trivy image ${IMAGE_NAME}:${IMAGE_TAG} \
+                          --no-progress --scanners vuln \
+                          --exit-code 0 --severity HIGH,CRITICAL --format table
                     """
                 }
             }
