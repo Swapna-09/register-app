@@ -24,12 +24,12 @@ stage("Cleanup Workspace & Docker") {
                 docker ps -aq | xargs -r docker rm -f || true
             '''
 
-            # Remove dangling images only (safer)
+            // Remove dangling images only (safer)
             sh '''
                 docker images -f "dangling=true" -q | xargs -r docker rmi -f || true
             '''
 
-            # Remove dangling volumes
+            // Remove dangling volumes
             sh '''
                 docker volume ls -qf dangling=true | xargs -r docker volume rm || true
             '''
