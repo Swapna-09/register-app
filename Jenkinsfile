@@ -13,22 +13,30 @@ pipeline {
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
         TRIVY_CACHE = "/mnt/ebs100/trivy"   // Trivy cache on EBS
     }
-    stages {
-        stage("Cleanup Workspace & Docker") {
-            steps {
-                script {
-                    // Clean Jenkins workspace
-                    cleanWs()
+stage("Cleanup Workspace & Docker") {
+    steps {
+        script {
+            // Clean Jenkins workspace
+            cleanWs()
 
-                    // Remove old Docker containers, images, and dangling volumes
-                    sh '''
-                        docker ps -aq | xargs -r docker rm -f
-                        docker images -aq | xargs -r docker rmi -f
-                        docker volume ls -q | xargs -r docker volume rm
-                    '''
-                }
-            }
+            // Safely remove stopped containers
+            sh '''
+                docker ps -aq | xargs -r docker rm -f || true
+            '''
+
+            # Remove dangling images only (safer)
+            sh '''
+                docker images -f "dangling=true" -q | xargs -r docker rmi -f || true
+            '''
+
+            # Remove dangling volumes
+            sh '''
+                docker volume ls -qf dangling=true | xargs -r docker volume rm || true
+            '''
         }
+    }
+}
+
 
         stage("Checkout from SCM") {
             steps {
