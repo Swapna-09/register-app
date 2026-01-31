@@ -105,4 +105,3 @@ stage("Cleanup Workspace & Docker") {
             }
         }
     }
-}
