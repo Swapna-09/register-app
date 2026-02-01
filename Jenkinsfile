@@ -5,103 +5,38 @@ pipeline {
         maven 'Maven3'
     }
     environment {
-        APP_NAME = "register-app-pipeline"
-        RELEASE = "1.0.0"
-        DOCKER_USER = "2swapna"
-        DOCKER_PASS = 'dockerhub'
-        IMAGE_NAME = "${DOCKER_USER}/${APP_NAME}"
-        IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
-        TRIVY_CACHE = "/mnt/ebs100/trivy"   // Trivy cache on EBS
+	    APP_NAME = "register-app-pipeline"
+            RELEASE = "1.0.0"
+            DOCKER_USER = "ashfaque9x"
+            DOCKER_PASS = 'dockerhub'
+            IMAGE_NAME = "${DOCKER_USER}" + "/" + "${APP_NAME}"
+            IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
+	    JENKINS_API_TOKEN = credentials("JENKINS_API_TOKEN")
     }
-stage("Cleanup Workspace & Docker") {
-    steps {
-        script {
-            // Clean Jenkins workspace
-            cleanWs()
-
-            // Safely remove stopped containers
-            sh '''
-                docker ps -aq | xargs -r docker rm -f || true
-            '''
-
-            // Remove dangling images only (safer)
-            sh '''
-                docker images -f "dangling=true" -q | xargs -r docker rmi -f || true
-            '''
-
-            // Remove dangling volumes
-            sh '''
-                docker volume ls -qf dangling=true | xargs -r docker volume rm || true
-            '''
-        }
-    }
-}
-
-
-        stage("Checkout from SCM") {
-            steps {
-                git branch: 'main', credentialsId: 'github', url: 'https://github.com/Ashfaque-9x/register-app'
-            }
+    stages{
+        stage("Cleanup Workspace"){
+                steps {
+                cleanWs()
+                }
         }
 
-        stage("Build Application") {
+        stage("Checkout from SCM"){
+                steps {
+                    git branch: 'main', credentialsId: 'github', url: 'https://github.com/Ashfaque-9x/register-app'
+                }
+        }
+
+        stage("Build Application"){
             steps {
                 sh "mvn clean package"
             }
-        }
 
-        stage("Test Application") {
-            steps {
-                sh "mvn test"
-            }
-        }
+       }
 
-        stage("SonarQube Analysis") {
-            steps {
-                script {
-                    withSonarQubeEnv(credentialsId: 'jenkins-sonarqube-token') {
-                        sh "mvn sonar:sonar"
-                    }
-                }
-            }
-        }
-
-        stage("Quality Gate") {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'jenkins-sonarqube-token'
-                }
-            }
-        }
-
-        stage("Build & Push Docker Image") {
-            steps {
-                script {
-                    docker.withRegistry('', DOCKER_PASS) {
-                        docker_image = docker.build("${IMAGE_NAME}")
-                        docker_image.push("${IMAGE_TAG}")
-                        docker_image.push('latest')
-                    }
-                }
-            }
-        }
-
-        stage("Trivy Scan") {
-            steps {
-                script {
-                    // Ensure Trivy cache folder exists
-                    sh "mkdir -p ${TRIVY_CACHE}"
-
-                    // Run Trivy scan with cache on EBS
-                    sh """
-                        docker run --rm \
-                          -v /var/run/docker.sock:/var/run/docker.sock \
-                          -v ${TRIVY_CACHE}:/root/.cache/ \
-                          aquasec/trivy image ${IMAGE_NAME}:${IMAGE_TAG} \
-                          --no-progress --scanners vuln \
-                          --exit-code 0 --severity HIGH,CRITICAL --format table
-                    """
-                }
-            }
-        }
+       stage("Test Application"){
+           steps {
+                 sh "mvn test"
+           }
+       }
     }
+}
