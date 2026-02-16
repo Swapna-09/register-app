@@ -37,7 +37,7 @@ pipeline {
            steps {
                  sh "mvn test"
            }
-       // }
+       }
        // stage("SonarQube Analysis"){
        //     steps {
 	      //      script {
