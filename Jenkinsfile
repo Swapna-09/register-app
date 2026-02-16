@@ -20,7 +20,7 @@ pipeline {
                 }
         }
 
-        stage("Checkout from SCM"){
+        stage("Checkout from cd repo"){
                 steps {
                     git branch: 'main', credentialsId: 'github', url: 'https://github.com/Swapna-09/register-app.git'
                 }
