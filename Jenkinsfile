@@ -1,7 +1,6 @@
 pipeline {
-    agent { label 'jenkins-agent' }
+    agent any
     tools {
-        jdk 'java17'
         maven 'maven3'
     }
     environment {
@@ -38,15 +37,15 @@ pipeline {
                  sh "mvn test"
            }
        }
-       // stage("SonarQube Analysis"){
-       //     steps {
-	      //      script {
-		     //    withSonarQubeEnv(credentialsId: 'sonarqube') { 
-       //                  sh "mvn sonar:sonar"
-		     //    }
-	      //      }	
-       //     }
-       // }
+       stage("SonarQube Analysis"){
+           steps {
+	           script {
+		        withSonarQubeEnv(credentialsId: 'sonarqube') { 
+                        sh "mvn sonar:sonar"
+		        }
+	           }	
+           }
+       }
 
        // stage("Quality Gate"){
        //     steps {
